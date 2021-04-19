@@ -1,9 +1,21 @@
+import os
+from pathlib import Path
+from datetime import datetime
+import logging
+
+from dotenv import load_dotenv
+
 import discord
-from discord.ext import commands, tasks
+from discord.ext import commands
 import json
 
-import secret
-import cogs.help
+import help
+from menu import Menu
+
+
+load_dotenv(".env")
+
+logging.basicConfig(level=logging.INFO)
 
 
 intents = discord.Intents.default()
@@ -22,22 +34,25 @@ def getPre(bot, message):
     return commands.when_mentioned_or(prefix, prefix + " ")(bot, message)
 
 
-client = commands.Bot(command_prefix=getPre, intents=intents, case_insensitive=True, help_command=cogs.help.HelpCommand(show_hidden=False),
+bot = commands.Bot(command_prefix=getPre, intents=intents, case_insensitive=True,
+                      help_command=help.HelpCommand(show_hidden=False),
                       description="Bot description")
 
 
-@client.event
+@bot.event
 async def on_ready():
+    print('---------------------------')
+    print(datetime.now())
     print('Logged in as:')
-    print(client.user.name)
-    print(client.user.id)
-    print('------')
+    print(bot.user.name)
+    print(bot.user.id)
+    print('---------------------------')
 
     game = discord.Game("")
-    await client.change_presence(status=discord.Status.online, activity=game)
+    await bot.change_presence(status=discord.Status.online, activity=game)
 
 
-@client.command(aliases=["setP", "p"])
+@bot.command(aliases=["setP", "p"])
 @commands.has_guild_permissions(manage_guild=True)
 async def setPrefix(ctx, *, prefix):
     with open("prefixes.json", "r") as f:
@@ -50,11 +65,18 @@ async def setPrefix(ctx, *, prefix):
             json.dump(prefixes, w, indent=4)
 
 
-initial_extensions = (
-    
-)
+def extensions():
+    files = Path("cogs").rglob("*.py")
+    for file in files:
+        yield file.as_posix()[:-3].replace("/", ".")
 
-for extension in initial_extensions:
-    client.load_extension(extension)
 
-client.run(secret.token)
+for ext_file in extensions():
+    try:
+        bot.load_extension(ext_file)
+        print(f"Loaded {ext_file}")
+    except Exception as ex:
+        print(f"Failed to load {ext_file}: {ex}")
+
+
+bot.run(os.getenv("TOKEN"))
